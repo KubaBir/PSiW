@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,7 +57,50 @@ int key_from_name(char* name) {
     return atoi(res);
 }
 
-int send_request(char receiver[], char command[]) {
+int send_response(char command[]) {
+    // Command, callback
+    char words[2][100] = {"", ""};
+    int index = 0;
+    int error = 1;
+    // Split the command into words
+    for (int i = 0; i < strlen(command); i++) {
+        if (command[i] == '"') {
+            error = 0;
+            index++;
+            continue;
+        }
+        strncat(words[index], &command[i], 1);
+    }
+    if (error) return -1;
+
+    // printf("Command is: %s\n", words[0]);
+    // printf("Response will be sent to: %s\n", words[1]);
+    int outgoing_fd = open(words[1], O_WRONLY);
+    if (outgoing_fd == -1) {
+        printf("Error while opening callback queue\n");
+        return -1;
+    }
+    close(STDOUT_FILENO);
+    dup(outgoing_fd);
+
+    // execl("/bin/sh", "/bin/sh", "-c", words[0], NULL);
+    system(words[0]);
+
+    return 0;
+}
+
+int await_response(char callback[]) {
+    mkfifo(callback, 0664);
+    int fd = open(callback, O_RDONLY);
+    char command_buf[200];
+    read(fd, &command_buf, sizeof(command_buf));
+    printf("Response:\n%s\n", command_buf);
+    unlink(callback);
+    raise(SIGINT);
+    return 0;
+}
+
+int send_request(char receiver[], char command[], char callback[]) {
     char receiver_key[30];
     sprintf(receiver_key, "%d", key_from_name(receiver));
     int outgoing_fd = open(receiver_key, O_WRONLY);
@@ -64,10 +108,13 @@ int send_request(char receiver[], char command[]) {
         printf("Wrong process name!\n");
         return -1;
     }
-
-    dup(outgoing_fd);
-    fflush(stdout);
-    execl("/bin/sh", "/bin/sh", "-c", command, NULL);
+    char sep = '"';
+    strncat(command, &sep, 1);
+    strcat(command, callback);
+    if (!fork())
+        await_response(callback);
+    int n_bytes = write(outgoing_fd, command, (strlen(command) + 1));
+    printf("Sent %d bytes\n", n_bytes);
 
     return 0;
 }
@@ -101,9 +148,11 @@ int await_command() {
         }
 
         if (error) continue;
-        fflush(stdout);
+
+        printf("Recieved a proper command, sending...\n");
         if (!fork()) {
-            send_request(words[0], words[1]);
+            send_request(words[0], words[1], words[2]);
+            raise(SIGINT);
             return -1;
         }
     }
@@ -111,28 +160,28 @@ int await_command() {
 
 int main(int argc, char* argv[]) {
     char my_key[30];
-    sprintf(my_key, "%d", key_from_name("test"));
+    if (argc == 1)
+        strcpy(my_key, "1");
+    else
+        sprintf(my_key, "%d", key_from_name(argv[1]));
     printf("%s\n", my_key);
-    // Open file
-
-    // Process file
-
-    printf("\n");
 
     mkfifo(my_key, 0664);
-    // Create 'sender' process
-    if (!fork())
+
+    // Create 'receiver' process
+    int receiver_pid = fork();
+    if (receiver_pid == 0) {
+        char incoming_msg[100];
+        int incoming_fd = open(my_key, O_RDONLY);
+        while (1) {
+            if (!read(incoming_fd, &incoming_msg, sizeof(incoming_msg))) continue;
+            printf("Got request!\n");
+            if (!fork())
+                send_response(incoming_msg);
+        }
+    } else
         await_command();
 
-    // Create receive process
-    char incoming_msg[100];
-    int incoming_fd = open(my_key, O_RDONLY);
-    while (1) {
-        sleep(1);
-        if (!read(incoming_fd, &incoming_msg, sizeof(incoming_msg))) continue;
-        printf("essa%s\n", incoming_msg);
-    }
-
-    printf("\n");
+    unlink(my_key);
     return 0;
 }
