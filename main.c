@@ -11,51 +11,6 @@
 #include <unistd.h>
 
 int key_from_name(char* name) {
-    // int config_fd;
-    // config_fd = open("config", O_RDONLY);
-    // if (config_fd == -1) {
-    //     perror("Error while opening config file. ");
-    //     return -1;
-    // }
-    // FILE* config_file = fdopen(config_fd, "r");
-
-    // char* command_buf = NULL;
-    // size_t len = 0;
-    // char current[20] = "";
-    // int found = 0;
-    // char res[20] = "";
-    // while (1) {
-    //     if (getline(&command_buf, &len, config_file) == -1) return -1;
-    //     // Assume the line can contain the correct name
-    //     int contains = 1;
-    //     for (int i = 0; i < strlen(command_buf) - 1; i++) {
-    //         if (!contains) break;
-    //         if (found) {
-    //             strncat(res, &command_buf[i], 1);
-    //         }
-    //         if (command_buf[i] == ' ' && !found) {
-    //             if (!strcmp(current, name))
-    //                 found = 1;
-    //             else {
-    //                 strcpy(current, "");
-    //                 // If the first word is wrong, don't check the next one
-    //                 contains = 0;
-    //                 continue;
-    //             }
-    //         }
-    //         strncat(current, &command_buf[i], 1);
-    //     }
-    //     if (found) break;
-    // }
-    // fclose(config_file);
-    // close(config_fd);
-    // if (!found) {
-    //     printf("Process not found!\n");
-    //     return -1;
-    // }
-
-    // return atoi(res);
-
     strtok(name, "\n");
     int config_fd;
     config_fd = open("config", O_RDONLY);
@@ -63,14 +18,11 @@ int key_from_name(char* name) {
         perror("Error while opening config file. ");
         return -1;
     }
-    FILE* config_file = fdopen(config_fd, "r");
 
     char buf;
     char current[20] = "";
     int found = 0;
-    char res[20] = "";
     while (read(config_fd, &buf, 1)) {
-        // Assume the line can contain the correct name
         if (buf == '\n') {
             if (found) break;
             strcpy(current, "");
@@ -88,7 +40,6 @@ int key_from_name(char* name) {
             strncat(current, &buf, 1);
     }
 
-    fclose(config_file);
     close(config_fd);
     if (!found) {
         printf("Process not found in configuration file.\n");
