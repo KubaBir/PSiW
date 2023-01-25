@@ -201,6 +201,7 @@ int main(int argc, char* argv[]) {
         await_command();
 
     printf("Cleaning up...\n");
+    kill(receiver_pid, SIGINT);
     unlink(my_key);
     return 0;
 }
