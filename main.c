@@ -74,8 +74,8 @@ void send_response(char command[]) {
     close(STDOUT_FILENO);
     dup(outgoing_fd);
 
-    // execl("/bin/sh", "/bin/sh", "-c", words[0], NULL);
-    system(words[0]);
+    execl("/bin/sh", "/bin/sh", "-c", words[0], NULL);
+    // system(words[0]);
 
     raise(SIGINT);
 }
